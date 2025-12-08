@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { useMessages } from "@/hooks/use-chat";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { MarkdownRenderer } from "./markdown-renderer";
 
 interface Message {
   id: string;
@@ -78,7 +79,13 @@ export function MessageList({ conversationId }: { conversationId: string }) {
                   : "mr-auto bg-muted"
               )}
             >
-              {msg.content}
+              {msg.role === "assistant" ? (
+                <MarkdownRenderer content={msg.content} isUserMessage={false} />
+              ) : (
+                <div className="whitespace-pre-wrap wrap-break-word">
+                  {msg.content}
+                </div>
+              )}
             </div>
           ))}
           <div ref={bottomRef} />

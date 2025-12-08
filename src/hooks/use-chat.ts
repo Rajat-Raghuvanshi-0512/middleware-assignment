@@ -2,14 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export const useMessages = (conversationId: string, page = 1, limit = 50) => {
+export const useMessages = (conversationId: string) => {
   return useQuery({
-    queryKey: ["messages", conversationId, page, limit],
+    queryKey: ["messages", conversationId],
     queryFn: async () => {
       const params = new URLSearchParams({
         conversationId,
-        page: page.toString(),
-        limit: limit.toString(),
       });
       const res = await fetch(`/api/messages/list?${params}`, {
         method: "GET",

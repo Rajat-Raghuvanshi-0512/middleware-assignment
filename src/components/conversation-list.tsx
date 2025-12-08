@@ -1,10 +1,11 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, AlertCircle } from "lucide-react";
+import { Plus, AlertCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 interface Conversation {
   id: string;
@@ -21,18 +22,12 @@ export function ConversationList({
 }) {
   const { userId } = useAuth();
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
-  const limit = 20;
 
   // Fetch conversations
   const { data, isLoading, error, isError } = useQuery({
-    queryKey: ["conversations", userId, page, limit],
+    queryKey: ["conversations", userId],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-      const res = await fetch(`/api/conversation/list?${params}`, {
+      const res = await fetch("/api/conversation/list", {
         method: "GET",
       });
 
@@ -47,7 +42,9 @@ export function ConversationList({
   });
 
   const conversations = data?.conversations ?? [];
-  const pagination = data?.pagination;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // New conversation mutation
   const createConversation = useMutation({
@@ -68,6 +65,78 @@ export function ConversationList({
       onSelect(data.conversationId); // auto-select new chat
     },
   });
+
+  // Update conversation mutation
+  const updateConversation = useMutation({
+    mutationFn: async (payload: { conversationId: string; title: string }) => {
+      const res = await fetch("/api/conversation/update", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update conversation");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversations", userId] });
+      setEditingId(null);
+      setEditValue("");
+    },
+  });
+
+  // Start editing
+  const handleStartEdit = (conversation: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(conversation.id);
+    setEditValue(conversation.title || "");
+  };
+
+  // Save edit
+  const handleSaveEdit = (conversationId: string) => {
+    const trimmedValue = editValue.trim();
+    if (trimmedValue && trimmedValue !== "") {
+      updateConversation.mutate({
+        conversationId,
+        title: trimmedValue,
+      });
+    } else {
+      setEditingId(null);
+      setEditValue("");
+    }
+  };
+
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  // Handle Enter key
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    conversationId: string
+  ) => {
+    if (e.key === "Enter") {
+      handleSaveEdit(conversationId);
+    } else if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  };
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
 
   return (
     <div className="flex flex-col gap-4 p-4 border-r h-full w-64 bg-muted/30">
@@ -106,32 +175,55 @@ export function ConversationList({
             No conversations yet
           </div>
         ) : (
-          <>
-            {conversations.map((c: Conversation) => (
-              <button
-                key={c.id}
-                className={`p-2 rounded text-left text-sm truncate ${
-                  selectedConversationId === c.id
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
-                }`}
-                onClick={() => onSelect(c.id)}
-                title={c.title || `Conversation ${c.id.slice(0, 8)}`}
-              >
-                {c.title || `New Conversation`}
-              </button>
-            ))}
-            {pagination?.hasMore && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => p + 1)}
-                className="mt-2"
-              >
-                Load More
-              </Button>
-            )}
-          </>
+          conversations.map((c: Conversation) => (
+            <div
+              key={c.id}
+              className={`group relative flex items-center gap-2 p-2 rounded text-left text-sm ${
+                selectedConversationId === c.id
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              } ${editingId === c.id ? "bg-muted" : ""}`}
+              onClick={() => {
+                if (editingId !== c.id) {
+                  onSelect(c.id);
+                }
+              }}
+            >
+              {editingId === c.id ? (
+                <Input
+                  ref={editInputRef}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, c.id)}
+                  onBlur={() => handleSaveEdit(c.id)}
+                  className="h-8 text-sm flex-1"
+                  maxLength={255}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  <span
+                    title={c.title || `New Conversation`}
+                    className="flex-1 truncate cursor-default"
+                  >
+                    {c.title || `New Conversation`}
+                  </span>
+                  <button
+                    className={`opacity-0 cursor-pointer group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background/20 shrink-0 ${
+                      selectedConversationId === c.id
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                    onClick={(e) => handleStartEdit(c, e)}
+                    title="Edit conversation name"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))
         )}
       </div>
     </div>
