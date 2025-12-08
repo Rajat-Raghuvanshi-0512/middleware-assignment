@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useAuth, UserButton } from '@clerk/nextjs';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { UserButton } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { Plus, AlertCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ConversationAPI } from '@/types/api';
-import type { ConversationResponse, ErrorResponse } from '@/types/api';
+import {
+  useConversations,
+  useCreateConversation,
+  useUpdateConversation,
+} from '@/hooks/use-chat';
+import type { ConversationResponse } from '@/types/api';
 
 export function ConversationList({
   selectedConversationId,
@@ -17,8 +20,6 @@ export function ConversationList({
   selectedConversationId?: string;
   onSelect?: (id: string) => void;
 }) {
-  const { userId } = useAuth();
-  const qc = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -31,86 +32,18 @@ export function ConversationList({
   const activeConversationId = pathConversationId || selectedConversationId;
 
   // Fetch conversations
-  const { data, isLoading, error, isError } = useQuery<
-    ConversationAPI.ListResponse,
-    Error
-  >({
-    queryKey: ['conversations', userId],
-    queryFn: async (): Promise<ConversationAPI.ListResponse> => {
-      const res = await fetch('/api/conversation/list', {
-        method: 'GET',
-      });
-
-      if (!res.ok) {
-        const error: ErrorResponse = await res.json();
-        throw new Error(error.error || 'Failed to fetch conversations');
-      }
-
-      const data: ConversationAPI.ListResponse = await res.json();
-      return data;
-    },
-    enabled: !!userId,
-  });
-
+  const { data, isLoading, error, isError } = useConversations();
   const conversations = data?.conversations ?? [];
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
   // New conversation mutation
-  const createConversation = useMutation<ConversationAPI.StartResponse, Error>({
-    mutationFn: async (): Promise<ConversationAPI.StartResponse> => {
-      const res = await fetch('/api/conversation/start', {
-        method: 'POST',
-      });
-
-      if (!res.ok) {
-        const error: ErrorResponse = await res.json();
-        throw new Error(error.error || 'Failed to create conversation');
-      }
-
-      const data: ConversationAPI.StartResponse = await res.json();
-      return data;
-    },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['conversations', userId] });
-      // Navigate to the new conversation
-      router.push(`/chat/${data.conversationId}`);
-      onSelect?.(data.conversationId); // Call onSelect if provided
-    },
-  });
+  const createConversation = useCreateConversation();
 
   // Update conversation mutation
-  const updateConversation = useMutation<
-    ConversationAPI.UpdateResponse,
-    Error,
-    ConversationAPI.UpdateRequest
-  >({
-    mutationFn: async (
-      payload: ConversationAPI.UpdateRequest
-    ): Promise<ConversationAPI.UpdateResponse> => {
-      const res = await fetch('/api/conversation/update', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error: ErrorResponse = await res.json();
-        throw new Error(error.error || 'Failed to update conversation');
-      }
-
-      const data: ConversationAPI.UpdateResponse = await res.json();
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['conversations', userId] });
-      setEditingId(null);
-      setEditValue('');
-    },
-  });
+  const updateConversation = useUpdateConversation();
 
   // Start editing
   const handleStartEdit = (
@@ -126,10 +59,18 @@ export function ConversationList({
   const handleSaveEdit = (conversationId: string) => {
     const trimmedValue = editValue.trim();
     if (trimmedValue && trimmedValue !== '') {
-      updateConversation.mutate({
-        conversationId,
-        title: trimmedValue,
-      });
+      updateConversation.mutate(
+        {
+          conversationId,
+          title: trimmedValue,
+        },
+        {
+          onSuccess: () => {
+            setEditingId(null);
+            setEditValue('');
+          },
+        }
+      );
     } else {
       setEditingId(null);
       setEditValue('');
@@ -164,10 +105,21 @@ export function ConversationList({
 
   return (
     <div className="flex flex-col gap-4 p-4 border-r h-full w-64 bg-muted/30">
+      {/* gradient text which moves from left to right */}
+      <div className="text-lg font-bold text-center bg-linear-to-b from-slate-300 to-secondary bg-clip-text text-transparent mb-1">
+        Middleware Assignment
+      </div>
       {/* Start new chat button */}
       <Button
         className="w-full flex items-center justify-center gap-2"
-        onClick={() => createConversation.mutate()}
+        onClick={() => {
+          createConversation.mutate(undefined, {
+            onSuccess: (data) => {
+              router.push(`/chat/${data.conversationId}`);
+              onSelect?.(data.conversationId);
+            },
+          });
+        }}
         disabled={createConversation.isPending}
       >
         <Plus className="w-4 h-4" />
