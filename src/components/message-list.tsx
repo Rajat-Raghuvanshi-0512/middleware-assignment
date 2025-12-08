@@ -5,13 +5,7 @@ import { useMessages } from "@/hooks/use-chat";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { MarkdownRenderer } from "./markdown-renderer";
-
-interface Message {
-  id: string;
-  role: string;
-  content: string;
-  createdAt: Date | string;
-}
+import type { MessageResponse } from "@/types/api";
 
 export function MessageList({ conversationId }: { conversationId: string }) {
   const { data, isLoading, error, isError } = useMessages(conversationId);
@@ -69,7 +63,7 @@ export function MessageList({ conversationId }: { conversationId: string }) {
         </div>
       ) : (
         <>
-          {messages.map((msg: Message) => (
+          {messages.map((msg: MessageResponse) => (
             <div
               key={msg.id}
               className={cn(

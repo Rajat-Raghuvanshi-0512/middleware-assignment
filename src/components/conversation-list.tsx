@@ -1,17 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, AlertCircle, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
-interface Conversation {
-  id: string;
-  title: string | null;
-  createdAt: Date | string;
-}
+import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, AlertCircle, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ConversationAPI } from '@/types/api';
+import type { ConversationResponse, ErrorResponse } from '@/types/api';
 
 export function ConversationList({
   selectedConversationId,
@@ -24,98 +20,113 @@ export function ConversationList({
   const qc = useQueryClient();
 
   // Fetch conversations
-  const { data, isLoading, error, isError } = useQuery({
-    queryKey: ["conversations", userId],
-    queryFn: async () => {
-      const res = await fetch("/api/conversation/list", {
-        method: "GET",
+  const { data, isLoading, error, isError } = useQuery<
+    ConversationAPI.ListResponse,
+    Error
+  >({
+    queryKey: ['conversations', userId],
+    queryFn: async (): Promise<ConversationAPI.ListResponse> => {
+      const res = await fetch('/api/conversation/list', {
+        method: 'GET',
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to fetch conversations");
+        const error: ErrorResponse = await res.json();
+        throw new Error(error.error || 'Failed to fetch conversations');
       }
 
-      return res.json();
+      const data: ConversationAPI.ListResponse = await res.json();
+      return data;
     },
     enabled: !!userId,
   });
 
   const conversations = data?.conversations ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editValue, setEditValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
   // New conversation mutation
-  const createConversation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/conversation/start", {
-        method: "POST",
+  const createConversation = useMutation<ConversationAPI.StartResponse, Error>({
+    mutationFn: async (): Promise<ConversationAPI.StartResponse> => {
+      const res = await fetch('/api/conversation/start', {
+        method: 'POST',
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to create conversation");
+        const error: ErrorResponse = await res.json();
+        throw new Error(error.error || 'Failed to create conversation');
       }
 
-      return res.json();
+      const data: ConversationAPI.StartResponse = await res.json();
+      return data;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["conversations", userId] });
+      qc.invalidateQueries({ queryKey: ['conversations', userId] });
       onSelect(data.conversationId); // auto-select new chat
     },
   });
 
   // Update conversation mutation
-  const updateConversation = useMutation({
-    mutationFn: async (payload: { conversationId: string; title: string }) => {
-      const res = await fetch("/api/conversation/update", {
-        method: "PATCH",
+  const updateConversation = useMutation<
+    ConversationAPI.UpdateResponse,
+    Error,
+    ConversationAPI.UpdateRequest
+  >({
+    mutationFn: async (
+      payload: ConversationAPI.UpdateRequest
+    ): Promise<ConversationAPI.UpdateResponse> => {
+      const res = await fetch('/api/conversation/update', {
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to update conversation");
+        const error: ErrorResponse = await res.json();
+        throw new Error(error.error || 'Failed to update conversation');
       }
 
-      return res.json();
+      const data: ConversationAPI.UpdateResponse = await res.json();
+      return data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["conversations", userId] });
+      qc.invalidateQueries({ queryKey: ['conversations', userId] });
       setEditingId(null);
-      setEditValue("");
+      setEditValue('');
     },
   });
 
   // Start editing
-  const handleStartEdit = (conversation: Conversation, e: React.MouseEvent) => {
+  const handleStartEdit = (
+    conversation: ConversationResponse,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     setEditingId(conversation.id);
-    setEditValue(conversation.title || "");
+    setEditValue(conversation.title || '');
   };
 
   // Save edit
   const handleSaveEdit = (conversationId: string) => {
     const trimmedValue = editValue.trim();
-    if (trimmedValue && trimmedValue !== "") {
+    if (trimmedValue && trimmedValue !== '') {
       updateConversation.mutate({
         conversationId,
         title: trimmedValue,
       });
     } else {
       setEditingId(null);
-      setEditValue("");
+      setEditValue('');
     }
   };
 
   // Cancel edit
   const handleCancelEdit = () => {
     setEditingId(null);
-    setEditValue("");
+    setEditValue('');
   };
 
   // Handle Enter key
@@ -123,9 +134,9 @@ export function ConversationList({
     e: React.KeyboardEvent<HTMLInputElement>,
     conversationId: string
   ) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       handleSaveEdit(conversationId);
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       handleCancelEdit();
     }
   };
@@ -147,7 +158,7 @@ export function ConversationList({
         disabled={createConversation.isPending}
       >
         <Plus className="w-4 h-4" />
-        {createConversation.isPending ? "Creating..." : "New Chat"}
+        {createConversation.isPending ? 'Creating...' : 'New Chat'}
       </Button>
 
       {/* Error state */}
@@ -157,7 +168,7 @@ export function ConversationList({
           <span>
             {error instanceof Error
               ? error.message
-              : "Failed to load conversations"}
+              : 'Failed to load conversations'}
           </span>
         </div>
       )}
@@ -175,14 +186,14 @@ export function ConversationList({
             No conversations yet
           </div>
         ) : (
-          conversations.map((c: Conversation) => (
+          conversations.map((c: ConversationResponse) => (
             <div
               key={c.id}
               className={`group relative flex items-center gap-2 p-2 rounded text-left text-sm ${
                 selectedConversationId === c.id
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
-              } ${editingId === c.id ? "bg-muted" : ""}`}
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-muted'
+              } ${editingId === c.id ? 'bg-muted' : ''}`}
               onClick={() => {
                 if (editingId !== c.id) {
                   onSelect(c.id);
@@ -212,8 +223,8 @@ export function ConversationList({
                   <button
                     className={`opacity-0 cursor-pointer group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background/20 shrink-0 ${
                       selectedConversationId === c.id
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground"
+                        ? 'text-primary-foreground'
+                        : 'text-muted-foreground'
                     }`}
                     onClick={(e) => handleStartEdit(c, e)}
                     title="Edit conversation name"

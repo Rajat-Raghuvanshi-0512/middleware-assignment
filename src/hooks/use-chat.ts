@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { MessagesAPI, ErrorResponse } from "@/types/api";
 
 export const useMessages = (conversationId: string) => {
-  return useQuery({
+  return useQuery<MessagesAPI.ListResponse, Error>({
     queryKey: ["messages", conversationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<MessagesAPI.ListResponse> => {
       const params = new URLSearchParams({
         conversationId,
       });
@@ -14,11 +15,11 @@ export const useMessages = (conversationId: string) => {
       });
 
       if (!res.ok) {
-        const error = await res.json();
+        const error: ErrorResponse = await res.json();
         throw new Error(error.error || "Failed to fetch messages");
       }
 
-      const data = await res.json();
+      const data: MessagesAPI.ListResponse = await res.json();
       return data;
     },
     enabled: !!conversationId,
@@ -28,11 +29,14 @@ export const useMessages = (conversationId: string) => {
 export const useSendMessage = () => {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (payload: {
-      conversationId: string;
-      content: string;
-    }) => {
+  return useMutation<
+    MessagesAPI.SendResponse,
+    Error,
+    MessagesAPI.SendRequest
+  >({
+    mutationFn: async (
+      payload: MessagesAPI.SendRequest
+    ): Promise<MessagesAPI.SendResponse> => {
       const res = await fetch("/api/messages/send", {
         method: "POST",
         headers: {
@@ -42,11 +46,12 @@ export const useSendMessage = () => {
       });
 
       if (!res.ok) {
-        const error = await res.json();
+        const error: ErrorResponse = await res.json();
         throw new Error(error.error || "Failed to send message");
       }
 
-      return res.json();
+      const data: MessagesAPI.SendResponse = await res.json();
+      return data;
     },
     onSuccess: (_, variables) => {
       // Invalidate messages queries for this conversation

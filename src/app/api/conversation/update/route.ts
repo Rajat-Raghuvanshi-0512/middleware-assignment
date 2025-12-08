@@ -1,22 +1,24 @@
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/db/drizzle";
-import { conversations } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { z } from "zod";
+import { auth } from '@clerk/nextjs/server';
+import { db } from '@/db/drizzle';
+import { conversations } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
+import { ConversationAPI } from '@/types/api';
+import type { ErrorResponse } from '@/types/api';
 
-const bodySchema = z.object({
-  conversationId: z.string().uuid(),
-  title: z.string().min(1).max(255),
-});
+const bodySchema = ConversationAPI.UpdateRequestSchema;
 
-export const PATCH = async (req: Request) => {
+export const PATCH = async (req: Request): Promise<Response> => {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+      const errorResponse: ErrorResponse = { error: 'Unauthorized' };
+      return Response.json(errorResponse, { status: 401 });
     }
 
-    const body = bodySchema.parse(await req.json());
+    const body: ConversationAPI.UpdateRequest = bodySchema.parse(
+      await req.json()
+    );
 
     // Verify conversation ownership
     const conversation = await db.query.conversations.findFirst({
@@ -27,10 +29,10 @@ export const PATCH = async (req: Request) => {
     });
 
     if (!conversation) {
-      return Response.json(
-        { error: "Conversation not found or access denied" },
-        { status: 404 }
-      );
+      const errorResponse: ErrorResponse = {
+        error: 'Conversation not found or access denied',
+      };
+      return Response.json(errorResponse, { status: 404 });
     }
 
     // Update conversation title
@@ -40,16 +42,19 @@ export const PATCH = async (req: Request) => {
       .where(eq(conversations.id, body.conversationId))
       .returning();
 
-    return Response.json({ conversation: updated });
+    const response: ConversationAPI.UpdateResponse = { conversation: updated };
+    return Response.json(response);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json(
-        { error: "Invalid request data", details: error.issues },
-        { status: 400 }
-      );
+      const errorResponse: ErrorResponse = {
+        error: 'Invalid request data',
+        details: error.issues,
+      };
+      return Response.json(errorResponse, { status: 400 });
     }
 
-    console.error("Error updating conversation:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    console.error('Error updating conversation:', error);
+    const errorResponse: ErrorResponse = { error: 'Internal server error' };
+    return Response.json(errorResponse, { status: 500 });
   }
 };
