@@ -3,6 +3,13 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+// Dynamic import to avoid Next.js build issues
+const SyntaxHighlighter = dynamic(
+  () => import("react-syntax-highlighter").then((mod) => mod.Prism),
+  { ssr: false }
+);
 
 interface MarkdownRendererProps {
   content: string;
@@ -20,25 +27,50 @@ export function MarkdownRenderer({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Style code blocks
+          // Style code blocks with syntax highlighting
           code: (props) => {
-            const { className, children } = props;
+            const { className, children, ...rest } = props;
+            const match = /language-(\w+)/.exec(className || "");
+            const language = match ? match[1] : "";
             const isBlock = className?.includes("language-");
-            return isBlock ? (
+
+            if (isBlock && language) {
+              // Custom dark theme style for code blocks
+              const customStyle = {
+                backgroundColor: "transparent",
+                padding: "1rem",
+                margin: 0,
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem",
+                lineHeight: "1.5",
+              };
+
+              return (
+                <div className="my-2 rounded-md bg-muted/30 overflow-hidden">
+                  <SyntaxHighlighter
+                    language={language}
+                    PreTag="div"
+                    style={
+                      typeof window !== "undefined"
+                        ? require("react-syntax-highlighter/dist/cjs/styles/prism").oneDark
+                        : {}
+                    }
+                    customStyle={customStyle}
+                    {...rest}
+                  >
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
+                </div>
+              );
+            }
+
+            return (
               <code
                 className={cn(
-                  "block p-3 rounded-md bg-background/50 dark:bg-background/30 overflow-x-auto text-sm font-mono my-2",
+                  "px-1.5 py-0.5 rounded bg-muted/50 text-sm font-mono",
                   className
                 )}
-              >
-                {String(children).replace(/\n$/, "")}
-              </code>
-            ) : (
-              <code
-                className={cn(
-                  "px-1.5 py-0.5 rounded bg-background/50 dark:bg-background/30 text-sm font-mono",
-                  className
-                )}
+                {...rest}
               >
                 {children}
               </code>
@@ -46,7 +78,7 @@ export function MarkdownRenderer({
           },
           // Style pre blocks
           pre: ({ children }) => {
-            return <div className="my-2">{children}</div>;
+            return <>{children}</>;
           },
           // Style paragraphs
           p: ({ children }) => (

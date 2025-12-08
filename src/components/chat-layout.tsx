@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { ConversationList } from "./conversation-list";
-import { MessageList } from "./message-list";
-import { ChatInput } from "./chat-input";
+import { useState } from 'react';
+import { ConversationList } from './conversation-list';
+import { MessageList } from './message-list';
+import { ChatInput } from './chat-input';
 
 export function ChatLayout() {
   const [conversationId, setConversationId] = useState<string | null>(null);
