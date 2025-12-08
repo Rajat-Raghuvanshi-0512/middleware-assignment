@@ -7,11 +7,15 @@ import type { MessagesAPI } from '@/types/api';
 
 // Mock dependencies
 jest.mock('@/hooks/use-chat');
-jest.mock('sonner', () => ({
-  toast: {
-    error: jest.fn(),
-  },
-}));
+
+jest.mock('sonner', () => {
+  const mockToastError = jest.fn();
+  return {
+    toast: {
+      error: mockToastError,
+    },
+  };
+});
 
 const mockUseSendMessage = useSendMessage as jest.MockedFunction<
   typeof useSendMessage
@@ -209,5 +213,75 @@ describe('ChatInput', () => {
 
     // Should not call mutate again if already pending
     expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('should show toast error when send fails with Error instance', async () => {
+    const { toast } = await import('sonner');
+    render(<ChatInput conversationId={VALID_CONV_ID} />);
+
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    act(() => {
+      fireEvent.change(textarea, { target: { value: 'Test message' } });
+      fireEvent.click(screen.getByRole('button', { name: /send message/i }));
+    });
+
+    // Get the onError callback and call it with an Error instance
+    const lastCall = mockMutate.mock.calls[mockMutate.mock.calls.length - 1];
+    if (lastCall && lastCall[1]?.onError) {
+      await act(async () => {
+        lastCall[1].onError(new Error('Network error'));
+      });
+    }
+
+    expect(toast.error).toHaveBeenCalledWith('Network error');
+  });
+
+  it('should show default error message when error is not an Error instance', async () => {
+    const { toast } = await import('sonner');
+    render(<ChatInput conversationId={VALID_CONV_ID} />);
+
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    act(() => {
+      fireEvent.change(textarea, { target: { value: 'Test message' } });
+      fireEvent.click(screen.getByRole('button', { name: /send message/i }));
+    });
+
+    // Get the onError callback and call it with a non-Error value
+    const lastCall = mockMutate.mock.calls[mockMutate.mock.calls.length - 1];
+    if (lastCall && lastCall[1]?.onError) {
+      await act(async () => {
+        lastCall[1].onError('Some error' as any);
+      });
+    }
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'Failed to send message. Please try again.'
+    );
+  });
+
+  it('should show warning color when character count is between 9500-9900', () => {
+    render(<ChatInput conversationId={VALID_CONV_ID} />);
+
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    const warningText = 'a'.repeat(9600);
+    act(() => {
+      fireEvent.change(textarea, { target: { value: warningText } });
+    });
+
+    const counter = screen.getByText(/9600\/10000/i);
+    expect(counter).toHaveClass('text-warning');
+  });
+
+  it('should show destructive color when character count is above 9900', () => {
+    render(<ChatInput conversationId={VALID_CONV_ID} />);
+
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    const criticalText = 'a'.repeat(9950);
+    act(() => {
+      fireEvent.change(textarea, { target: { value: criticalText } });
+    });
+
+    const counter = screen.getByText(/9950\/10000/i);
+    expect(counter).toHaveClass('text-destructive');
   });
 });

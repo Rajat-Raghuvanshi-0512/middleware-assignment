@@ -147,4 +147,17 @@ describe('MessageList', () => {
       expect(scrollIntoViewMock).toHaveBeenCalled();
     });
   });
+
+  it('should show default error message when error is not an Error instance', () => {
+    mockUseMessages.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: 'Something went wrong' as any,
+    } as any);
+
+    render(<MessageList conversationId={VALID_CONV_ID} />);
+
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
+  });
 });

@@ -56,7 +56,7 @@ export function MessageList({ conversationId }: { conversationId: string }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 ">
+    <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4">
       {messages.length === 0 ? (
         <div className="flex items-center justify-center h-full text-muted-foreground">
           No messages yet. Start the conversation!
@@ -67,7 +67,7 @@ export function MessageList({ conversationId }: { conversationId: string }) {
             <div
               key={msg.id}
               className={cn(
-                'p-5 rounded-xl w-[80%] my-5 relative',
+                'p-3 md:p-5 rounded-xl w-[90%] md:w-[80%] my-3 md:my-5 relative',
                 msg.role === 'user'
                   ? 'ml-auto bg-primary text-primary-foreground'
                   : 'mr-auto bg-muted'

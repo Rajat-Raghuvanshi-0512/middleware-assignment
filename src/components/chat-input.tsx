@@ -70,20 +70,20 @@ export function ChatInput({ conversationId }: { conversationId: string }) {
           </div>
         </div>
       )}
-      <div className="p-4">
-        <div className="relative flex items-end gap-3">
+      <div className="p-3 md:py-4 md:px-0">
+        <div className="relative flex items-end gap-2 md:gap-3">
           <div className="relative flex-1">
             <Textarea
               ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message… (Press Enter to send, Shift+Enter for new line)"
+              placeholder="Type your message…"
               disabled={sendMessage.isPending}
               maxLength={10000}
               rows={1}
               className={cn(
-                'resize-none pr-12 py-3',
+                'resize-none pr-12 py-2 md:py-3 text-sm md:text-base',
                 'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent'
               )}
             />
@@ -109,7 +109,7 @@ export function ChatInput({ conversationId }: { conversationId: string }) {
             disabled={sendMessage.isPending || !value.trim()}
             size="icon"
             className={cn(
-              'h-11 w-11 shrink-0 rounded-full shadow-md transition-all',
+              'h-10 w-10 md:h-11 md:w-11 shrink-0 rounded-full shadow-md transition-all',
               'hover:scale-105 active:scale-95',
               'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'
             )}
@@ -122,7 +122,7 @@ export function ChatInput({ conversationId }: { conversationId: string }) {
             <span className="sr-only">Send message</span>
           </Button>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground hidden md:block">
           Press{' '}
           <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded border">
             Enter

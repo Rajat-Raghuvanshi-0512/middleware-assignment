@@ -1,4 +1,4 @@
-import { ConversationList } from '@/components/conversation-list';
+import { Sidebar } from '@/components/sidebar';
 
 export default function MainLayout({
   children,
@@ -6,9 +6,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen">
-      <ConversationList />
-      <div className="flex flex-col flex-1">{children}</div>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex flex-col flex-1 min-w-0">{children}</div>
     </div>
   );
 }
