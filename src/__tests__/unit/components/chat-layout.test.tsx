@@ -4,14 +4,6 @@ import { ChatLayout } from '@/components/chat-layout';
 const VALID_CONV_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 // Mock child components
-jest.mock('@/components/conversation-list', () => ({
-  ConversationList: ({ onSelect }: { onSelect: (id: string) => void }) => (
-    <div data-testid="conversation-list">
-      <button onClick={() => onSelect(VALID_CONV_ID)}>Select Conversation</button>
-    </div>
-  ),
-}));
-
 jest.mock('@/components/message-list', () => ({
   MessageList: ({ conversationId }: { conversationId: string }) => (
     <div data-testid="message-list">
@@ -29,21 +21,13 @@ jest.mock('@/components/chat-input', () => ({
 }));
 
 describe('ChatLayout', () => {
-  it('should render conversation list', () => {
-    render(<ChatLayout />);
-    expect(screen.getByTestId('conversation-list')).toBeInTheDocument();
-  });
-
   it('should show placeholder when no conversation is selected', () => {
     render(<ChatLayout />);
     expect(screen.getByText(/select a conversation/i)).toBeInTheDocument();
   });
 
   it('should render message list and input when conversation is selected', () => {
-    render(<ChatLayout />);
-
-    const selectButton = screen.getByText('Select Conversation');
-    fireEvent.click(selectButton);
+    render(<ChatLayout conversationId={VALID_CONV_ID} />);
 
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
     expect(screen.getByTestId('chat-input')).toBeInTheDocument();
@@ -51,13 +35,16 @@ describe('ChatLayout', () => {
   });
 
   it('should update when different conversation is selected', () => {
-    render(<ChatLayout />);
-
-    const selectButton = screen.getByText('Select Conversation');
-    fireEvent.click(selectButton);
+    const { rerender } = render(<ChatLayout conversationId={VALID_CONV_ID} />);
 
     expect(screen.getByText(`Messages for ${VALID_CONV_ID}`)).toBeInTheDocument();
     expect(screen.getByText(`Input for ${VALID_CONV_ID}`)).toBeInTheDocument();
+
+    const newConvId = '660e8400-e29b-41d4-a716-446655440001';
+    rerender(<ChatLayout conversationId={newConvId} />);
+
+    expect(screen.getByText(`Messages for ${newConvId}`)).toBeInTheDocument();
+    expect(screen.getByText(`Input for ${newConvId}`)).toBeInTheDocument();
   });
 });
 

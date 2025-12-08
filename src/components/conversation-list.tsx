@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, UserButton } from '@clerk/nextjs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter, usePathname } from 'next/navigation';
 import { Plus, AlertCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +15,20 @@ export function ConversationList({
   onSelect,
 }: {
   selectedConversationId?: string;
-  onSelect: (id: string) => void;
+  onSelect?: (id: string) => void;
 }) {
   const { userId } = useAuth();
   const qc = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Extract conversationId from pathname if on /chat/[conversationId]
+  const pathConversationId = pathname?.startsWith('/chat/')
+    ? pathname.split('/chat/')[1]?.split('/')[0]
+    : undefined;
+
+  // Use pathname conversationId if available, otherwise use prop
+  const activeConversationId = pathConversationId || selectedConversationId;
 
   // Fetch conversations
   const { data, isLoading, error, isError } = useQuery<
@@ -63,7 +74,9 @@ export function ConversationList({
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['conversations', userId] });
-      onSelect(data.conversationId); // auto-select new chat
+      // Navigate to the new conversation
+      router.push(`/chat/${data.conversationId}`);
+      onSelect?.(data.conversationId); // Call onSelect if provided
     },
   });
 
@@ -190,13 +203,14 @@ export function ConversationList({
             <div
               key={c.id}
               className={`group relative flex items-center gap-2 p-2 rounded text-left text-sm ${
-                selectedConversationId === c.id
+                activeConversationId === c.id
                   ? 'bg-primary text-primary-foreground'
                   : 'hover:bg-muted'
               } ${editingId === c.id ? 'bg-muted' : ''}`}
               onClick={() => {
                 if (editingId !== c.id) {
-                  onSelect(c.id);
+                  router.push(`/chat/${c.id}`);
+                  onSelect?.(c.id);
                 }
               }}
             >
@@ -222,7 +236,7 @@ export function ConversationList({
                   </span>
                   <button
                     className={`opacity-0 cursor-pointer group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background/20 shrink-0 ${
-                      selectedConversationId === c.id
+                      activeConversationId === c.id
                         ? 'text-primary-foreground'
                         : 'text-muted-foreground'
                     }`}
@@ -236,6 +250,9 @@ export function ConversationList({
             </div>
           ))
         )}
+      </div>
+      <div className="text-sm text-muted-foreground">
+        <UserButton />
       </div>
     </div>
   );

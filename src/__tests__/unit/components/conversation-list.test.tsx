@@ -15,6 +15,29 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: jest.fn(),
 }));
 
+// Mock next/navigation with jest.fn() so we can override in tests
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockPrefetch = jest.fn();
+const mockBack = jest.fn();
+const mockForward = jest.fn();
+const mockRefresh = jest.fn();
+const mockUseRouter = jest.fn(() => ({
+  push: mockPush,
+  replace: mockReplace,
+  prefetch: mockPrefetch,
+  back: mockBack,
+  forward: mockForward,
+  refresh: mockRefresh,
+}));
+const mockUsePathname = jest.fn(() => '/');
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => mockUseRouter(),
+  usePathname: () => mockUsePathname(),
+  useSearchParams: jest.fn(() => new URLSearchParams()),
+}));
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseQuery = useQuery as jest.MockedFunction<typeof useQuery>;
 const mockUseMutation = useMutation as jest.MockedFunction<typeof useMutation>;
@@ -52,6 +75,17 @@ describe('ConversationList', () => {
       isError: false,
       error: null,
     } as any);
+
+    // Reset router and pathname mocks
+    mockUseRouter.mockReturnValue({
+      push: mockPush,
+      replace: mockReplace,
+      prefetch: mockPrefetch,
+      back: mockBack,
+      forward: mockForward,
+      refresh: mockRefresh,
+    });
+    mockUsePathname.mockReturnValue('/');
   });
 
   it('should render conversation list', () => {
@@ -137,13 +171,16 @@ describe('ConversationList', () => {
     const conversation = screen.getByText('Test Conversation 1');
     fireEvent.click(conversation);
 
+    expect(mockPush).toHaveBeenCalledWith(`/chat/${VALID_CONV_ID}`);
     expect(mockOnSelect).toHaveBeenCalledWith(VALID_CONV_ID);
   });
 
   it('should highlight selected conversation', () => {
+    mockUsePathname.mockReturnValue(`/chat/${VALID_CONV_ID}`);
+
     render(
       <ConversationList
-        selectedConversationId={VALID_CONV_ID}
+        selectedConversationId={undefined}
         onSelect={mockOnSelect}
       />
     );

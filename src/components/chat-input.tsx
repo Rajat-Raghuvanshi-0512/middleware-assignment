@@ -57,7 +57,7 @@ export function ChatInput({ conversationId }: { conversationId: string }) {
   };
 
   return (
-    <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 max-w-3xl mx-auto w-full">
+    <div className="border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 max-w-3xl mx-auto w-full">
       {sendMessage.isError && (
         <div className="px-4 pt-3">
           <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

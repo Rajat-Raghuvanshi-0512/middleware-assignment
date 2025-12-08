@@ -28,17 +28,24 @@ jest.mock('next/navigation', () => ({
 }));
 
 // Mock Clerk
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: jest.fn(() => ({
-    userId: 'test-user-id',
-    isLoaded: true,
-    isSignedIn: true,
-  })),
-  auth: jest.fn(() => ({
-    userId: 'test-user-id',
-  })),
-  ClerkProvider: jest.fn(({ children }) => children),
-}));
+jest.mock('@clerk/nextjs', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  return {
+    useAuth: jest.fn(() => ({
+      userId: 'test-user-id',
+      isLoaded: true,
+      isSignedIn: true,
+    })),
+    auth: jest.fn(() => ({
+      userId: 'test-user-id',
+    })),
+    ClerkProvider: jest.fn(({ children }) => children),
+    UserButton: jest.fn(() =>
+      React.createElement('div', { 'data-testid': 'user-button' }, 'UserButton')
+    ),
+  };
+});
 
 // Mock environment variables
 process.env.GROQ_API_KEY = 'test-groq-api-key';
