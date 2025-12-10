@@ -15,6 +15,20 @@
       "when": 1765182765290,
       "tag": "0001_kind_carnage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765370211085,
+      "tag": "0002_melted_wallop",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1765371793406,
+      "tag": "0003_nosy_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }

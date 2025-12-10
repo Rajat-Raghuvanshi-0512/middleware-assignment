@@ -28,16 +28,30 @@ jest.mock('groq-sdk', () => {
   }));
 });
 
+jest.mock('@/lib/memory', () => ({
+  getUserMemory: jest.fn(),
+  updateUserMemory: jest.fn(),
+}));
+
+jest.mock('@/lib/prompts', () => ({
+  buildMessagesWithMemory: jest.fn(),
+}));
+
 import { POST } from '@/app/api/messages/send/route';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/db/drizzle';
 import Groq from 'groq-sdk';
+import { getUserMemory, updateUserMemory } from '@/lib/memory';
+import { buildMessagesWithMemory } from '@/lib/prompts';
 import { mockConversation } from '../../../../fixtures/conversations';
 import { mockMessages } from '../../../../fixtures/messages';
 import type { ConversationResponse, MessageResponse } from '@/types/api';
 
 const mockAuth = auth as jest.MockedFunction<typeof auth>;
 const MockGroq = Groq as jest.MockedClass<typeof Groq>;
+const mockGetUserMemory = getUserMemory as jest.MockedFunction<typeof getUserMemory>;
+const mockUpdateUserMemory = updateUserMemory as jest.MockedFunction<typeof updateUserMemory>;
+const mockBuildMessagesWithMemory = buildMessagesWithMemory as jest.MockedFunction<typeof buildMessagesWithMemory>;
 
 type MockDb = {
   query: {
@@ -54,7 +68,11 @@ type MockDb = {
   };
   insert: jest.MockedFunction<
     (table: unknown) => {
-      values: jest.MockedFunction<(values: unknown) => Promise<void>>;
+      values: jest.MockedFunction<
+        (values: unknown) => {
+          returning: jest.MockedFunction<() => Promise<MessageResponse[]>>;
+        }
+      >;
     }
   >;
   update: jest.MockedFunction<
@@ -114,6 +132,27 @@ describe('POST /api/messages/send', () => {
       },
     };
     MockGroq.mockImplementation(() => mockGroqInstance as unknown as Groq);
+    
+    // Mock memory functions with default implementations
+    mockGetUserMemory.mockResolvedValue(null);
+    mockUpdateUserMemory.mockResolvedValue({
+      id: 'memory-id',
+      userId: 'test-user-id',
+      facts: [],
+      messageCount: 0,
+      lastProcessedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    mockBuildMessagesWithMemory.mockImplementation((history, _memory, _userMessage) => {
+      return [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        ...history.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+      ];
+    });
   });
 
   it('should send message and get AI response', async () => {
@@ -122,8 +161,20 @@ describe('POST /api/messages/send', () => {
     >);
     mockDb.query.conversations.findFirst.mockResolvedValue(mockConversation);
     mockDb.query.messages.findMany.mockResolvedValue(mockMessages);
+    
+    const mockReturning = jest.fn().mockResolvedValue([{
+      id: 'msg-id',
+      conversationId: VALID_CONV_ID,
+      role: 'user',
+      content: 'Hello',
+      createdAt: new Date(),
+    }]);
+    const mockValues = jest.fn().mockReturnValue({
+      returning: mockReturning,
+    });
+    
     mockDb.insert.mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: mockValues,
     });
     mockDb.update.mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -220,8 +271,20 @@ describe('POST /api/messages/send', () => {
     >);
     mockDb.query.conversations.findFirst.mockResolvedValue(mockConversation);
     mockDb.query.messages.findMany.mockResolvedValue(mockMessages);
+    
+    const mockReturning = jest.fn().mockResolvedValue([{
+      id: 'msg-id',
+      conversationId: VALID_CONV_ID,
+      role: 'user',
+      content: 'Hello',
+      createdAt: new Date(),
+    }]);
+    const mockValues = jest.fn().mockReturnValue({
+      returning: mockReturning,
+    });
+    
     mockDb.insert.mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: mockValues,
     });
 
     const request = new Request('http://localhost/api/messages/send', {
@@ -247,8 +310,20 @@ describe('POST /api/messages/send', () => {
     >);
     mockDb.query.conversations.findFirst.mockResolvedValue(mockConversation);
     mockDb.query.messages.findMany.mockResolvedValue(mockMessages);
+    
+    const mockReturning = jest.fn().mockResolvedValue([{
+      id: 'msg-id',
+      conversationId: VALID_CONV_ID,
+      role: 'user',
+      content: 'Hello',
+      createdAt: new Date(),
+    }]);
+    const mockValues = jest.fn().mockReturnValue({
+      returning: mockReturning,
+    });
+    
     mockDb.insert.mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: mockValues,
     });
     mockGroqInstance.chat.completions.create.mockResolvedValue({
       choices: [{ message: { content: '' } }],
@@ -278,8 +353,20 @@ describe('POST /api/messages/send', () => {
       title: null,
     });
     mockDb.query.messages.findMany.mockResolvedValue([mockMessages[0]]); // Only one message
+    
+    const mockReturning = jest.fn().mockResolvedValue([{
+      id: 'msg-id',
+      conversationId: VALID_CONV_ID,
+      role: 'user',
+      content: 'This is a long message that should be truncated for title',
+      createdAt: new Date(),
+    }]);
+    const mockValues = jest.fn().mockReturnValue({
+      returning: mockReturning,
+    });
+    
     mockDb.insert.mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: mockValues,
     });
 
     const mockWhere = jest.fn().mockResolvedValue(undefined);

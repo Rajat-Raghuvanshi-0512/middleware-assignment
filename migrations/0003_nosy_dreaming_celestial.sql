@@ -1,0 +1,1 @@
+ALTER TABLE "user_memory" ADD COLUMN "last_processed_at" timestamp;

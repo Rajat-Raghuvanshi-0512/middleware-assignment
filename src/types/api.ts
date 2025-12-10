@@ -1,11 +1,13 @@
 import { z } from 'zod';
-import type { conversations, messages } from '@/db/schema';
+import type { conversations, messages, userMemory } from '@/db/schema';
 
 // Database entity types
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type NewMessage = typeof messages.$inferInsert;
+export type UserMemory = typeof userMemory.$inferSelect;
+export type NewUserMemory = typeof userMemory.$inferInsert;
 
 // API response types (dates are serialized as strings in JSON, but can be null from DB)
 export type ConversationResponse = Omit<Conversation, 'createdAt'> & {
@@ -13,6 +15,10 @@ export type ConversationResponse = Omit<Conversation, 'createdAt'> & {
 };
 export type MessageResponse = Omit<Message, 'createdAt'> & {
   createdAt: string | Date | null;
+};
+export type UserMemoryResponse = Omit<UserMemory, 'createdAt' | 'updatedAt'> & {
+  createdAt: string | Date | null;
+  updatedAt: string | Date | null;
 };
 
 // API Request/Response Types
@@ -61,6 +67,22 @@ export namespace MessagesAPI {
   export type SendRequest = z.infer<typeof SendRequestSchema>;
   export type SendResponse = {
     reply: string;
+  };
+}
+
+// Profile/Memory API Types
+export namespace ProfileAPI {
+  // GET /api/profile/get
+  export type GetRequest = void;
+  export type GetResponse = {
+    profile: UserMemoryResponse | null;
+  };
+
+  // POST /api/profile/refresh - manually trigger profile rebuild from all messages
+  export type RefreshRequest = void;
+  export type RefreshResponse = {
+    profile: UserMemoryResponse;
+    factsAdded: number;
   };
 }
 

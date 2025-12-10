@@ -6,6 +6,8 @@ import Groq from 'groq-sdk';
 import { z } from 'zod';
 import { MessagesAPI } from '@/types/api';
 import type { ErrorResponse } from '@/types/api';
+import { getUserMemory, updateUserMemory } from '@/lib/memory';
+import { buildMessagesWithMemory } from '@/lib/prompts';
 
 const bodySchema = MessagesAPI.SendRequestSchema;
 
@@ -35,26 +37,16 @@ export const POST = async (req: Request): Promise<Response> => {
     }
 
     // 1. Save user message
-    await db.insert(messages).values({
-      role: 'user',
-      content: body.content,
-      conversationId: body.conversationId,
-    });
+    const userMessageResult = await db
+      .insert(messages)
+      .values({
+        role: 'user',
+        content: body.content,
+        conversationId: body.conversationId,
+      })
+      .returning();
 
-    // 2. Fetch full conversation history
-    const history = await db.query.messages.findMany({
-      where: eq(messages.conversationId, body.conversationId),
-      orderBy: (msg, { asc }) => [asc(msg.createdAt)],
-    });
-
-    // 3. Convert to Groq format
-    type GroqMessage = { role: 'user' | 'assistant'; content: string };
-    const groqMessages: GroqMessage[] = history.map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }));
-
-    // 4. Get API key and create client
+    // 2. Get API key (needed for both LLM and memory operations)
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       const errorResponse: ErrorResponse = {
@@ -63,6 +55,26 @@ export const POST = async (req: Request): Promise<Response> => {
       return Response.json(errorResponse, { status: 500 });
     }
 
+    // 3. Fetch user's memory profile
+    const userMemoryProfile = await getUserMemory(userId);
+
+    // 4. Fetch full conversation history
+    const history = await db.query.messages.findMany({
+      where: eq(messages.conversationId, body.conversationId),
+      orderBy: (msg, { asc }) => [asc(msg.createdAt)],
+    });
+
+    // 5. Build messages with memory-enhanced system prompt
+    const groqMessages = buildMessagesWithMemory(
+      history.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      userMemoryProfile,
+      body.content
+    );
+
+    // 6. Create Groq client and get response
     const client = new Groq({ apiKey });
 
     const chat = await client.chat.completions.create({
@@ -79,14 +91,14 @@ export const POST = async (req: Request): Promise<Response> => {
       return Response.json(errorResponse, { status: 500 });
     }
 
-    // 5. Save AI reply
+    // 7. Save AI reply
     await db.insert(messages).values({
       role: 'assistant',
       content: reply,
       conversationId: body.conversationId,
     });
 
-    // 6. Update conversation title if it's the first user message
+    // 8. Update conversation title if it's the first user message
     if (history.length === 1 && !conversation.title) {
       const title = body.content.slice(0, 50).trim();
       await db
@@ -94,6 +106,18 @@ export const POST = async (req: Request): Promise<Response> => {
         .set({ title })
         .where(eq(conversations.id, body.conversationId));
     }
+
+    // 9. Update user memory profile with new facts from this message
+    // This runs asynchronously in the background - we don't await it
+    // to avoid slowing down the response
+    // Pass the message timestamp to enable incremental processing
+    const userMessageTimestamp = userMessageResult[0]?.createdAt || new Date();
+    updateUserMemory(userId, body.content, apiKey, userMessageTimestamp).catch(
+      (error) => {
+        console.error('Error updating user memory:', error);
+        // Don't fail the request if memory update fails
+      }
+    );
 
     const response: MessagesAPI.SendResponse = { reply };
     return Response.json(response);
